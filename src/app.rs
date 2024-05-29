@@ -25,7 +25,45 @@ impl App {
     }
 
     fn render_frame(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.size());
+        let main_layout = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Length(1),
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ],
+        )
+        .split(frame.size());
+
+        let title_bar_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Length(50), Constraint::Min(0)],
+        )
+        .split(main_layout[0]);
+
+        frame.render_widget(
+            Block::new().borders(Borders::TOP).title("Title Bar"),
+            title_bar_layout[0],
+        );
+
+        frame.render_widget(
+            Block::new().borders(Borders::TOP).title("Title Bar"),
+            title_bar_layout[1],
+        );
+
+        frame.render_widget(
+            Block::new().borders(Borders::TOP).title("Status Bar"),
+            main_layout[2],
+        );
+
+        let inner_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .split(main_layout[1]);
+
+        frame.render_widget(Block::bordered().title("Left"), inner_layout[0]);
+        frame.render_widget(Block::bordered().title("Right"), inner_layout[1]);
     }
 
     /// updates the application's state based on user input
