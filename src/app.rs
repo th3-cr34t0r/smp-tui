@@ -154,7 +154,7 @@ impl App {
             // Line chart
             Dataset::default()
                 .name(name)
-                .marker(symbols::Marker::Block)
+                .marker(symbols::Marker::HalfBlock)
                 .graph_type(GraphType::Line)
                 .style(style)
                 .data(data),
