@@ -67,7 +67,10 @@ impl App {
         .split(inner_layout[0]);
 
         frame.render_widget(Block::bordered().title(" Network Stats "), stats_layout[0]);
-        frame.render_widget(Block::bordered().title(" Pool Stats "), stats_layout[1]);
+        frame.render_widget(
+            Block::bordered().title(self.counter.to_string().yellow()),
+            stats_layout[1],
+        );
         frame.render_widget(Block::bordered().title(" Miner Stats "), stats_layout[2]);
 
         let chart_layout = Layout::new(
@@ -80,52 +83,57 @@ impl App {
         )
         .split(inner_layout[1]);
 
-        // Create the datasets to fill the chart with
-        let datasets = vec![
-            // Line chart
-            Dataset::default()
-                .name("Th/s")
-                .marker(symbols::Marker::Braille)
-                .graph_type(GraphType::Line)
-                .style(Style::default().magenta())
-                .data(&[
-                    (0.0, 9.3),
-                    (1.0, 9.0),
-                    (2.0, 10.0),
-                    (3.0, 10.5),
-                    (4.0, 12.0),
-                    (5.0, 11.3),
-                ]),
-        ];
+        frame.render_widget(
+            render_chart(" Network Hashrate ", Style::default().cyan()),
+            chart_layout[0],
+        );
 
-        // Create the X axis and define its properties
-        let x_axis = Axis::default()
-            .title("X Axis".red())
-            .style(Style::default().white())
-            .bounds([0.0, 5.0])
-            .labels(vec!["0.0".into(), "2.5".into(), "5.0".into()]);
+        frame.render_widget(
+            render_chart(" Pool Hashrate ", Style::default().magenta()),
+            chart_layout[1],
+        );
+        frame.render_widget(
+            render_chart(" Miner Hashrate ", Style::default().light_green()),
+            chart_layout[2],
+        );
 
-        // Create the Y axis and define its properties
-        let y_axis = Axis::default()
-            .title("Y Axis".red())
-            .style(Style::default().white())
-            .bounds([5.0, 15.0])
-            .labels(vec!["5.0".into(), "10.0".into(), "15.0".into()]);
+        fn render_chart(name: &'static str, style: Style) -> Chart<'static> {
+            // Create the datasets to fill the chart with
+            let datasets = vec![
+                // Line chart
+                Dataset::default()
+                    .name(name)
+                    .marker(symbols::Marker::Braille)
+                    .graph_type(GraphType::Line)
+                    .style(style)
+                    .data(&[(0.0, 12.3), (1.0, 11.3), (2.0, 14.3), (3.0, 16.3)]),
+            ];
 
-        // Create the chart and link all the parts together
-        let chart = Chart::new(datasets)
-            .block(Block::new().title(" Network Hashrate "))
-            .x_axis(x_axis)
-            .y_axis(y_axis);
+            // Create the X axis and define its properties
+            let x_axis = Axis::default()
+                .title("X Axis".red())
+                .style(Style::default().white())
+                .bounds([0.0, 5.0])
+                .labels(vec!["0.0".into(), "2.5".into(), "5.0".into()]);
 
-        frame.render_widget(chart, chart_layout[0]);
+            // Create the Y axis and define its properties
+            let y_axis = Axis::default()
+                .title("Y Axis".red())
+                .style(Style::default().white())
+                .bounds([5.0, 25.0])
+                .labels(vec![
+                    "5.0".into(),
+                    "10.0".into(),
+                    "15.0".into(),
+                    "20.0".into(),
+                ]);
 
-        // frame.render_widget(
-        //     Block::bordered().title(" Network Hashrate "),
-        //     chart_layout[0],
-        // );
-        frame.render_widget(Block::bordered().title(" Pool Hashrate "), chart_layout[1]);
-        frame.render_widget(Block::bordered().title(" Miner Hashrate "), chart_layout[2]);
+            // Create the chart and link all the parts together
+            Chart::new(datasets)
+                .block(Block::new())
+                .x_axis(x_axis)
+                .y_axis(y_axis)
+        }
     }
 
     /// updates the application's state based on user input
