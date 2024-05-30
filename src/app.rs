@@ -123,7 +123,7 @@ impl App {
             self.render_chart(
                 "Pool Hashrate",
                 "Blocks",
-                "Th/s",
+                "Gh/s",
                 Style::default().white(),
                 &self.pool_hashrate.clone(),
             ),
