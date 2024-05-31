@@ -3,22 +3,41 @@ use std::{io, rc::Rc, thread::sleep, time::Duration, vec};
 use crate::{database::get_network_hashrate, tui};
 use crossterm::event::{self, poll, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{prelude::*, symbols::border, widgets::*};
+#[derive(Debug, Default)]
+struct NetworkStats {
+    hashrate: Vec<(f64, f64)>,
+    difficulty: f64,
+    height: u32,
+    reward: u8,
+    reward_reduction: u8,
+    price: u8,
+}
+
+#[derive(Debug, Default)]
+struct PoolStats {
+    hashrate: Vec<(f64, f64)>,
+    connected_miners: u32,
+    effort: f32,
+    total_blocks: u32,
+    block_found_time: u8,
+}
+
+#[derive(Debug, Default)]
+struct MinerStats {
+    hashrate: Vec<(f64, f64)>,
+    average_hashrate: f64,
+    pending_shares: f64,
+    pending_balance: f64,
+    round_contribution: f64,
+    total_paid: f64,
+}
 
 #[derive(Debug, Default)]
 pub struct App {
-    counter: u8,
-    network_hashrate: Vec<(f64, f64)>,
-    network_difficulty: f64,
-    block_height: u32,
-    block_reward: u8,
-    block_reward_reduction: u8,
-    price: u8,
-    pool_hashrate: Vec<(f64, f64)>,
-    connected_miners: u32,
-    current_effort: f32,
-    blocks_found: u32,
-    block_found_every: u8,
-    miner_hashrate: Vec<(f64, f64)>,
+    address: String,
+    network: NetworkStats,
+    pool: PoolStats,
+    miner: MinerStats,
     exit: bool,
 }
 
@@ -105,19 +124,19 @@ impl App {
             ],
             vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
             vec![
-                self.network_hashrate.last().unwrap().1.to_string().as_str(),
-                self.network_difficulty.to_string().as_str(),
-                self.block_height.to_string().as_str(),
+                (self.network.hashrate.last().unwrap().1.to_string() + " Th/s").as_str(),
+                self.network.difficulty.to_string().as_str(),
+                self.network.height.to_string().as_str(),
             ],
             vec![
-                self.block_reward.to_string().as_str(),
-                self.block_reward_reduction.to_string().as_str(),
-                self.price.to_string().as_str(),
+                self.network.reward.to_string().as_str(),
+                self.network.reward_reduction.to_string().as_str(),
+                self.network.price.to_string().as_str(),
             ],
             "Network Hashrate",
             "Block",
             "Th/s",
-            self.network_hashrate.clone(),
+            self.network.hashrate.clone(),
         );
 
         self.render(
@@ -126,44 +145,44 @@ impl App {
             vec![" Pool Hashrate ", " Connected Miners ", " Current Effort "],
             vec![" Block found every ", " Blocks found ", ""],
             vec![
-                self.pool_hashrate.last().unwrap().1.to_string().as_str(),
-                self.connected_miners.to_string().as_str(),
-                self.current_effort.to_string().as_str(),
+                (self.pool.hashrate.last().unwrap().1.to_string() + " Gh/s").as_str(),
+                self.pool.connected_miners.to_string().as_str(),
+                self.pool.effort.to_string().as_str(),
             ],
             vec![
-                self.block_found_every.to_string().as_str(),
-                self.blocks_found.to_string().as_str(),
+                self.pool.block_found_time.to_string().as_str(),
+                self.pool.total_blocks.to_string().as_str(),
                 "1",
             ],
             "Pool Hashrate",
             "Block",
             "Gh/s",
-            self.pool_hashrate.clone(),
+            self.pool.hashrate.clone(),
         );
 
         self.render(
             frame,
             stats_layout[2],
             vec![
-                " Network Hashrate ",
-                " Network Difficulty ",
-                " Block Height ",
+                " Current Hashrate ",
+                " Average 24h Hashrate ",
+                " Round Contribution ",
             ],
-            vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
+            vec![" Pending Shares ", " Pending Balance ", " Total Paid "],
             vec![
-                self.network_hashrate.last().unwrap().1.to_string().as_str(),
-                self.network_difficulty.to_string().as_str(),
-                self.block_height.to_string().as_str(),
+                (self.miner.hashrate.last().unwrap().1.to_string() + " Mh/s").as_str(),
+                self.miner.average_hashrate.to_string().as_str(),
+                self.miner.round_contribution.to_string().as_str(),
             ],
             vec![
-                self.block_reward.to_string().as_str(),
-                self.block_reward_reduction.to_string().as_str(),
-                self.price.to_string().as_str(),
+                self.miner.pending_shares.to_string().as_str(),
+                self.miner.pending_balance.to_string().as_str(),
+                self.miner.total_paid.to_string().as_str(),
             ],
-            "Network Hashrate",
-            "Block",
-            "Th/s",
-            self.network_hashrate.clone(),
+            "Miner Hashrate",
+            "Time",
+            "Mh/s",
+            self.miner.hashrate.clone(),
         );
     }
 
@@ -331,9 +350,9 @@ impl App {
     }
 
     fn get_hashrate(&mut self) {
-        self.network_hashrate = get_network_hashrate();
-        self.pool_hashrate = get_network_hashrate();
-        self.miner_hashrate = get_network_hashrate();
+        self.network.hashrate = get_network_hashrate();
+        self.pool.hashrate = get_network_hashrate();
+        self.miner.hashrate = get_network_hashrate();
     }
 
     /// updates the application's state based on user input
@@ -352,21 +371,11 @@ impl App {
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Left => self.decrement_counter(),
-            KeyCode::Right => self.increment_counter(),
             _ => {}
         }
     }
 
     fn exit(&mut self) {
         self.exit = true;
-    }
-
-    fn increment_counter(&mut self) {
-        self.counter += 1;
-    }
-
-    fn decrement_counter(&mut self) {
-        self.counter -= 1;
     }
 }
