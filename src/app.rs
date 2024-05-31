@@ -1,4 +1,4 @@
-use std::{io, thread::sleep, time::Duration};
+use std::{io, rc::Rc, thread::sleep, time::Duration, vec};
 
 use crate::{database::get_network_hashrate, tui};
 use crossterm::event::{self, poll, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -6,12 +6,20 @@ use ratatui::{prelude::*, symbols::border, widgets::*};
 
 #[derive(Debug, Default)]
 pub struct App {
-    pub counter: u8,
-    pub network_hashrate: Vec<(f64, f64)>,
-    pub pool_hashrate: Vec<(f64, f64)>,
-    pub miner_hashrate: Vec<(f64, f64)>,
-    pub first_run: bool,
-    pub exit: bool,
+    counter: u8,
+    network_hashrate: Vec<(f64, f64)>,
+    network_difficulty: f64,
+    block_height: u32,
+    block_reward: u8,
+    block_reward_reduction: u8,
+    price: u8,
+    pool_hashrate: Vec<(f64, f64)>,
+    connected_miners: u32,
+    current_effort: f32,
+    blocks_found: u32,
+    block_found_every: u8,
+    miner_hashrate: Vec<(f64, f64)>,
+    exit: bool,
 }
 
 impl App {
@@ -21,7 +29,7 @@ impl App {
             if poll(Duration::from_millis(1000))? {
                 self.handle_events()?;
             }
-            self.update_chart_data();
+            self.get_hashrate();
             terminal.draw(|frame| self.render_frame(frame))?;
         }
         Ok(())
@@ -68,20 +76,6 @@ impl App {
         )
         .split(main_layout[1]);
 
-        let pool_layout = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .margin(1)
-        .split(stats_layout[1]);
-
-        let miner_layout = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .margin(1)
-        .split(stats_layout[2]);
-
         frame.render_widget(
             Block::bordered()
                 .title(" Network Stats ")
@@ -101,95 +95,75 @@ impl App {
             stats_layout[2],
         );
 
-        // Rendering Stats
-        let network_layout = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .margin(1)
-        .split(stats_layout[0]);
-
-        // Split the area in 2 segments:
-        let network_stats = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .margin(1)
-        .split(network_layout[0]);
-
-        let network_stats_left = Layout::new(
-            Direction::Vertical,
-            [
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-            ],
-        )
-        .split(network_stats[0]);
-
-        let network_stats_right = Layout::new(
-            Direction::Vertical,
-            [
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-            ],
-        )
-        .split(network_stats[1]);
-
-        self.render_stats(
+        self.render(
             frame,
-            network_stats_left,
+            stats_layout[0],
             vec![
                 " Network Hashrate ",
                 " Network Difficulty ",
-                " Block Height",
+                " Block Height ",
             ],
-            vec![12.to_string().as_str(), 1.to_string().as_str(), "1238393"],
-        );
-
-        self.render_stats(
-            frame,
-            network_stats_right,
-            vec![" Block Reward ", " Reward reduction in ", " ERG Price "],
+            vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
             vec![
-                27.to_string().as_str(),
-                (14.to_string() + " Days").as_str(),
-                "$14",
+                self.network_hashrate.last().unwrap().1.to_string().as_str(),
+                self.network_difficulty.to_string().as_str(),
+                self.block_height.to_string().as_str(),
             ],
+            vec![
+                self.block_reward.to_string().as_str(),
+                self.block_reward_reduction.to_string().as_str(),
+                self.price.to_string().as_str(),
+            ],
+            "Network Hashrate",
+            "Block",
+            "Th/s",
+            self.network_hashrate.clone(),
         );
 
-        // Rendering Charts
-        frame.render_widget(
-            self.render_chart(
-                "Network Hashrate",
-                "Blocks",
-                "Th/s",
-                Style::default().white(),
-                &self.network_hashrate.clone(),
-            ),
-            network_layout[1],
+        self.render(
+            frame,
+            stats_layout[1],
+            vec![" Pool Hashrate ", " Connected Miners ", " Current Effort "],
+            vec![" Block found every ", " Blocks found ", ""],
+            vec![
+                self.pool_hashrate.last().unwrap().1.to_string().as_str(),
+                self.connected_miners.to_string().as_str(),
+                self.current_effort.to_string().as_str(),
+            ],
+            vec![
+                self.block_found_every.to_string().as_str(),
+                self.blocks_found.to_string().as_str(),
+                "1",
+            ],
+            "Pool Hashrate",
+            "Block",
+            "Gh/s",
+            self.pool_hashrate.clone(),
         );
 
-        frame.render_widget(
-            self.render_chart(
-                "Pool Hashrate",
-                "Blocks",
-                "Gh/s",
-                Style::default().white(),
-                &self.pool_hashrate.clone(),
-            ),
-            pool_layout[1],
-        );
-        frame.render_widget(
-            self.render_chart(
-                "Miner Hashrate",
-                "Time",
-                "Mh/s",
-                Style::default().white(),
-                &self.miner_hashrate.clone(),
-            ),
-            miner_layout[1],
+        self.render(
+            frame,
+            stats_layout[2],
+            vec![
+                " Network Hashrate ",
+                " Network Difficulty ",
+                " Block Height ",
+            ],
+            vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
+            vec![
+                self.network_hashrate.last().unwrap().1.to_string().as_str(),
+                self.network_difficulty.to_string().as_str(),
+                self.block_height.to_string().as_str(),
+            ],
+            vec![
+                self.block_reward.to_string().as_str(),
+                self.block_reward_reduction.to_string().as_str(),
+                self.price.to_string().as_str(),
+            ],
+            "Network Hashrate",
+            "Block",
+            "Th/s",
+            self.network_hashrate.clone(),
         );
     }
 
@@ -216,13 +190,13 @@ impl App {
     }
 
     fn render_chart<'a>(
-        &'a self,
+        &self,
         name: &'static str,
         x_axis_title: &'static str,
         y_axis_title: &'static str,
         style: Style,
         data: &'a Vec<(f64, f64)>,
-    ) -> Chart {
+    ) -> Chart<'a> {
         // Create the datasets to fill the chart with
         let datasets = vec![
             // Line chart
@@ -290,11 +264,78 @@ impl App {
             .y_axis(y_axis)
     }
 
-    fn update_chart_data(&mut self) {
+    fn render(
+        &self,
+        frame: &mut Frame,
+        layout: Rect,
+        stats_title_left: Vec<&str>,
+        stats_title_right: Vec<&str>,
+        stats_value_left: Vec<&str>,
+        stats_value_right: Vec<&str>,
+        chart_name: &'static str,
+        chart_x_axis_title: &'static str,
+        chart_y_axis_title: &'static str,
+        chart_data: Vec<(f64, f64)>,
+    ) {
+        // Rendering Stats
+        let layout_1 = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(layout);
+
+        // Split the area in 2 segments:
+        let stats_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(layout_1[0]);
+
+        let stats_left = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ],
+        )
+        .split(stats_layout[0]);
+
+        let stats_right = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ],
+        )
+        .split(stats_layout[1]);
+
+        self.render_stats(frame, stats_left, stats_title_left, stats_value_left);
+
+        self.render_stats(frame, stats_right, stats_title_right, stats_value_right);
+
+        // Rendering Charts
+        frame.render_widget(
+            self.render_chart(
+                chart_name,
+                chart_x_axis_title,
+                chart_y_axis_title,
+                Style::default().white(),
+                &chart_data,
+            ),
+            layout_1[1],
+        );
+    }
+
+    fn get_hashrate(&mut self) {
         self.network_hashrate = get_network_hashrate();
         self.pool_hashrate = get_network_hashrate();
         self.miner_hashrate = get_network_hashrate();
     }
+
     /// updates the application's state based on user input
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
