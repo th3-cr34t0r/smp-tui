@@ -68,13 +68,6 @@ impl App {
         )
         .split(main_layout[1]);
 
-        let network_layout = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .margin(1)
-        .split(stats_layout[0]);
-
         let pool_layout = Layout::new(
             Direction::Horizontal,
             [Constraint::Percentage(50), Constraint::Percentage(50)],
@@ -108,6 +101,65 @@ impl App {
             stats_layout[2],
         );
 
+        // Rendering Stats
+        let network_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(stats_layout[0]);
+
+        // Split the area in 2 segments:
+        let network_stats = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(network_layout[0]);
+
+        let network_stats_left = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ],
+        )
+        .split(network_stats[0]);
+
+        let network_stats_right = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ],
+        )
+        .split(network_stats[1]);
+
+        self.render_stats(
+            frame,
+            network_stats_left,
+            vec![
+                " Network Hashrate ",
+                " Network Difficulty ",
+                " Block Height",
+            ],
+            vec![12.to_string().as_str(), 1.to_string().as_str(), "1238393"],
+        );
+
+        self.render_stats(
+            frame,
+            network_stats_right,
+            vec![" Block Reward ", " Reward reduction in ", " ERG Price "],
+            vec![
+                27.to_string().as_str(),
+                (14.to_string() + " Days").as_str(),
+                "$14",
+            ],
+        );
+
+        // Rendering Charts
         frame.render_widget(
             self.render_chart(
                 "Network Hashrate",
@@ -139,6 +191,28 @@ impl App {
             ),
             miner_layout[1],
         );
+    }
+
+    fn render_stats(
+        &self,
+        frame: &mut Frame,
+        area: std::rc::Rc<[Rect]>,
+        title: Vec<&str>,
+        value: Vec<&str>,
+    ) {
+        for i in 0..area.len() {
+            let block = Block::bordered()
+                .title(title[i])
+                .title_alignment(Alignment::Center)
+                .style(Style::default().green());
+
+            let paragraph = Paragraph::new(value[i])
+                .alignment(Alignment::Center)
+                .block(block)
+                .light_green();
+
+            frame.render_widget(paragraph, area[i]);
+        }
     }
 
     fn render_chart<'a>(
@@ -255,36 +329,3 @@ impl App {
         self.counter -= 1;
     }
 }
-
-// impl Widget for &App {
-//     fn render(self, area: Rect, buf: &mut Buffer) {
-//         let title = Title::from(" Counter App Tutorial ".bold());
-//         let instructions = Title::from(Line::from(vec![
-//             " Decrement ".into(),
-//             "<Left>".blue().bold(),
-//             " Increment ".into(),
-//             "<Right>".blue().bold(),
-//             " Quit ".into(),
-//             "<Q> ".blue().bold(),
-//         ]));
-//         let block = Block::default()
-//             .title(title.alignment(Alignment::Center))
-//             .title(
-//                 instructions
-//                     .alignment(Alignment::Center)
-//                     .position(Position::Bottom),
-//             )
-//             .borders(Borders::ALL)
-//             .border_set(border::THICK);
-
-//         let counter_text = Text::from(vec![Line::from(vec![
-//             "Value: ".into(),
-//             self.counter.to_string().yellow(),
-//         ])]);
-
-//         Paragraph::new(counter_text)
-//             .centered()
-//             .block(block)
-//             .render(area, buf);
-//     }
-// }
