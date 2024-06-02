@@ -106,7 +106,7 @@ impl App {
             vec![
                 (stats.network.reward.to_string() + " Σ").as_str(),
                 stats.network.reward_reduction.to_string().as_str(),
-                (stats.network.price.to_string() + " USD").as_str(),
+                (stats.network.price.to_string() + " SigUSD").as_str(),
             ],
             "Network Hashrate",
             "Block",
@@ -220,12 +220,12 @@ impl App {
             .style(Style::default().green())
             .bounds([min_value_x, max_value_x])
             .labels(vec![
-                min_value_x.to_string().into(),
+                (min_value_x - 1.0).to_string().into(),
                 ((min_value_x + max_value_x) / 2.0)
                     .round()
                     .to_string()
                     .into(),
-                max_value_x.to_string().into(),
+                (max_value_x - 1.0).to_string().into(),
             ]);
 
         let min_value_y = data

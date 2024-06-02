@@ -8,7 +8,7 @@ pub struct NetworkStats {
     pub height: u64,
     pub reward: u8,
     pub reward_reduction: u8,
-    pub price: u8,
+    pub price: f64,
 }
 
 #[derive(Debug, Default)]
@@ -48,9 +48,10 @@ impl Stats {
 
     /// Get data from Mining Core API
     pub fn get_data(&mut self) -> Result<(), reqwest::Error> {
-        let url = "http://15.204.211.130:4000/api/pools/ErgoSigmanauts";
-
-        let data: serde_json::Value = get(url)?.json()?;
+        let pool_api_url = "http://15.204.211.130:4000/api/pools/ErgoSigmanauts";
+        let price_api_url = "https://api.spectrum.fi/v1/price-tracking/cmc/markets";
+        let hashrate_api = "https://api.ergoplatform.com/info";
+        let data: serde_json::Value = get(pool_api_url)?.json()?;
 
         //Format block height
         let block_height = data["pool"]["networkStats"]["blockHeight"].clone().as_u64();
@@ -62,10 +63,11 @@ impl Stats {
                 None => println!("No data available for Block Height"),
             }
 
+            let price_data: serde_json::Value = get(price_api_url)?.json()?;
+            let hashrate_data: serde_json::Value = get(hashrate_api)?.json()?;
+
             // Network Hashrate
-            let network_hashrate = data["pool"]["networkStats"]["networkHashrate"]
-                .clone()
-                .as_f64();
+            let network_hashrate = hashrate_data["hashRate"].clone().as_f64();
 
             match network_hashrate {
                 Some(network_hashrate) => {
@@ -94,6 +96,29 @@ impl Stats {
                 }
 
                 None => println!("No data available for Network Difficulty"),
+            }
+
+            // ERG Price
+
+            if let serde_json::Value::Array(arr) = price_data {
+                for obj in arr {
+                    if let serde_json::Value::Object(o) = obj {
+                        if let Some(base_name) = o.get("base_name") {
+                            if base_name == "ERG" {
+                                if let Some(quote_name) = o.get("quote_name") {
+                                    if quote_name == "SigUSD" {
+                                        if let Some(last_price) = o.get("last_price") {
+                                            if let Some(price) = last_price.as_f64() {
+                                                self.network.price =
+                                                    ((1.0 / price) * 100.0).round() / 100.0;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             //Pool hashrate
