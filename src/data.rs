@@ -17,7 +17,7 @@ pub struct PoolStats {
     pub connected_miners: u64,
     pub effort: f64,
     pub total_blocks: u64,
-    pub block_found_time: u8,
+    pub confirming_new_block: f64,
 }
 
 #[derive(Debug, Default)]
@@ -167,6 +167,21 @@ impl Stats {
                 }
 
                 None => println!("No data available for Pool Effort"),
+            }
+
+            //Pool confirming new block
+
+            let block_data: serde_json::Value = get(format!("{}/blocks", pool_api_url))?.json()?;
+
+            let pool_block_confirmation: (&str, f64) = (
+                block_data[0]["status"].as_str().unwrap(),
+                (block_data[0]["confirmationProgress"].as_f64().unwrap()) * 100.0,
+            );
+
+            if pool_block_confirmation.0 == "pending" {
+                self.pool.confirming_new_block = pool_block_confirmation.1;
+            } else {
+                self.pool.confirming_new_block = 100.0;
             }
         }
         self.miner.hashrate = self.get_hashrate();

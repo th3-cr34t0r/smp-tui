@@ -118,21 +118,55 @@ impl App {
             frame,
             stats_layout[1],
             vec![" Pool Hashrate ", " Connected Miners ", " Current Effort "],
-            vec![" Block found every ", " Blocks found ", ""],
+            vec![
+                " Block found every ",
+                " Blocks found ",
+                " Confirming block ",
+            ],
             vec![
                 (stats.pool.hashrate.last().unwrap().1.to_string() + " Gh/s").as_str(),
                 stats.pool.connected_miners.to_string().as_str(),
                 (stats.pool.effort.to_string() + " %").as_str(),
             ],
-            vec![
-                stats.pool.block_found_time.to_string().as_str(),
-                stats.pool.total_blocks.to_string().as_str(),
-                "1",
-            ],
+            vec!["", stats.pool.total_blocks.to_string().as_str(), ""],
             "Pool Hashrate",
             "Block",
             "Gh/s",
             stats.pool.hashrate.clone(),
+        );
+
+        // Adding Progress Bar
+        let layout_1 = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(stats_layout[1]);
+
+        // Split the area in 2 segments:
+        let stats_layout_progress = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .margin(1)
+        .split(layout_1[0]);
+
+        let stats_right = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ],
+        )
+        .split(stats_layout_progress[1]);
+
+        frame.render_widget(
+            Gauge::default()
+                .block(Block::new().padding(Padding::proportional(1)))
+                .gauge_style(Style::default().fg(Color::LightGreen))
+                .percent(stats.pool.confirming_new_block as u16),
+            stats_right[2],
         );
 
         self.render(
@@ -196,7 +230,7 @@ impl App {
             // Line chart
             Dataset::default()
                 .name(name)
-                .marker(symbols::Marker::HalfBlock)
+                .marker(symbols::Marker::Dot)
                 .graph_type(GraphType::Line)
                 .style(style)
                 .data(data),
