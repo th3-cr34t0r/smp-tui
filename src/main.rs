@@ -1,6 +1,6 @@
 use std::io;
 mod app;
-mod database;
+mod data;
 mod tui;
 fn main() -> io::Result<()> {
     let mut terminal = tui::init()?;

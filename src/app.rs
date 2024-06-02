@@ -1,60 +1,35 @@
-use std::{io, rc::Rc, thread::sleep, time::Duration, vec};
-
-use crate::{database::get_network_hashrate, tui};
+use crate::{data::*, tui};
 use crossterm::event::{self, poll, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{prelude::*, symbols::border, widgets::*};
-#[derive(Debug, Default)]
-struct NetworkStats {
-    hashrate: Vec<(f64, f64)>,
-    difficulty: f64,
-    height: u32,
-    reward: u8,
-    reward_reduction: u8,
-    price: u8,
-}
-
-#[derive(Debug, Default)]
-struct PoolStats {
-    hashrate: Vec<(f64, f64)>,
-    connected_miners: u32,
-    effort: f32,
-    total_blocks: u32,
-    block_found_time: u8,
-}
-
-#[derive(Debug, Default)]
-struct MinerStats {
-    hashrate: Vec<(f64, f64)>,
-    average_hashrate: f64,
-    pending_shares: f64,
-    pending_balance: f64,
-    round_contribution: f64,
-    total_paid: f64,
-}
+use ratatui::{prelude::*, widgets::*};
+use std::{io, time::Duration, vec};
 
 #[derive(Debug, Default)]
 pub struct App {
     address: String,
-    network: NetworkStats,
-    pool: PoolStats,
-    miner: MinerStats,
     exit: bool,
 }
 
 impl App {
     /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut tui::Tui) -> io::Result<()> {
+        let mut stats = Stats::default();
+
         while !self.exit {
-            if poll(Duration::from_millis(1000))? {
+            match stats.get_data() {
+                Ok(_) => self.exit = false,
+                Err(_) => self.exit = true,
+            }
+
+            terminal.draw(|frame| self.render_frame(frame, &stats))?;
+
+            if poll(Duration::from_secs(60))? {
                 self.handle_events()?;
             }
-            self.get_hashrate();
-            terminal.draw(|frame| self.render_frame(frame))?;
         }
         Ok(())
     }
 
-    fn render_frame(&mut self, frame: &mut Frame) {
+    fn render_frame(&mut self, frame: &mut Frame, stats: &Stats) {
         let main_layout = Layout::new(
             Direction::Vertical,
             [
@@ -124,19 +99,19 @@ impl App {
             ],
             vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
             vec![
-                (self.network.hashrate.last().unwrap().1.to_string() + " Th/s").as_str(),
-                self.network.difficulty.to_string().as_str(),
-                self.network.height.to_string().as_str(),
+                (stats.network.hashrate.last().unwrap().1.to_string()).as_str(),
+                (stats.network.difficulty.to_string() + "P").as_str(),
+                stats.network.height.to_string().as_str(),
             ],
             vec![
-                self.network.reward.to_string().as_str(),
-                self.network.reward_reduction.to_string().as_str(),
-                self.network.price.to_string().as_str(),
+                (stats.network.reward.to_string() + " Σ").as_str(),
+                stats.network.reward_reduction.to_string().as_str(),
+                (stats.network.price.to_string() + " USD").as_str(),
             ],
             "Network Hashrate",
             "Block",
             "Th/s",
-            self.network.hashrate.clone(),
+            stats.network.hashrate.clone(),
         );
 
         self.render(
@@ -145,19 +120,19 @@ impl App {
             vec![" Pool Hashrate ", " Connected Miners ", " Current Effort "],
             vec![" Block found every ", " Blocks found ", ""],
             vec![
-                (self.pool.hashrate.last().unwrap().1.to_string() + " Gh/s").as_str(),
-                self.pool.connected_miners.to_string().as_str(),
-                self.pool.effort.to_string().as_str(),
+                (stats.pool.hashrate.last().unwrap().1.to_string() + " Gh/s").as_str(),
+                stats.pool.connected_miners.to_string().as_str(),
+                (stats.pool.effort.to_string() + " %").as_str(),
             ],
             vec![
-                self.pool.block_found_time.to_string().as_str(),
-                self.pool.total_blocks.to_string().as_str(),
+                stats.pool.block_found_time.to_string().as_str(),
+                stats.pool.total_blocks.to_string().as_str(),
                 "1",
             ],
             "Pool Hashrate",
             "Block",
             "Gh/s",
-            self.pool.hashrate.clone(),
+            stats.pool.hashrate.clone(),
         );
 
         self.render(
@@ -170,19 +145,19 @@ impl App {
             ],
             vec![" Pending Shares ", " Pending Balance ", " Total Paid "],
             vec![
-                (self.miner.hashrate.last().unwrap().1.to_string() + " Mh/s").as_str(),
-                self.miner.average_hashrate.to_string().as_str(),
-                self.miner.round_contribution.to_string().as_str(),
+                (stats.miner.hashrate.last().unwrap().1.to_string() + " Mh/s").as_str(),
+                stats.miner.average_hashrate.to_string().as_str(),
+                stats.miner.round_contribution.to_string().as_str(),
             ],
             vec![
-                self.miner.pending_shares.to_string().as_str(),
-                self.miner.pending_balance.to_string().as_str(),
-                self.miner.total_paid.to_string().as_str(),
+                stats.miner.pending_shares.to_string().as_str(),
+                stats.miner.pending_balance.to_string().as_str(),
+                stats.miner.total_paid.to_string().as_str(),
             ],
             "Miner Hashrate",
             "Time",
             "Mh/s",
-            self.miner.hashrate.clone(),
+            stats.miner.hashrate.clone(),
         );
     }
 
@@ -246,7 +221,10 @@ impl App {
             .bounds([min_value_x, max_value_x])
             .labels(vec![
                 min_value_x.to_string().into(),
-                ((min_value_x + max_value_x) / 2.0).to_string().into(),
+                ((min_value_x + max_value_x) / 2.0)
+                    .round()
+                    .to_string()
+                    .into(),
                 max_value_x.to_string().into(),
             ]);
 
@@ -271,9 +249,18 @@ impl App {
                 max_value_y + (max_value_y * 0.1),
             ])
             .labels(vec![
-                (min_value_y - (min_value_y * 0.1)).to_string().into(),
-                ((min_value_y + max_value_y) / 2.0).to_string().into(),
-                (max_value_y + (max_value_y * 0.1)).to_string().into(),
+                (min_value_y - (min_value_y * 0.1))
+                    .round()
+                    .to_string()
+                    .into(),
+                ((min_value_y + max_value_y) / 2.0)
+                    .round()
+                    .to_string()
+                    .into(),
+                (max_value_y + (max_value_y * 0.1))
+                    .round()
+                    .to_string()
+                    .into(),
             ]);
 
         // Create the chart and link all the parts together
@@ -347,12 +334,6 @@ impl App {
             ),
             layout_1[1],
         );
-    }
-
-    fn get_hashrate(&mut self) {
-        self.network.hashrate = get_network_hashrate();
-        self.pool.hashrate = get_network_hashrate();
-        self.miner.hashrate = get_network_hashrate();
     }
 
     /// updates the application's state based on user input
