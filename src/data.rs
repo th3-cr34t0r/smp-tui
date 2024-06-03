@@ -1,9 +1,10 @@
-use rand::*;
+use std::collections::VecDeque;
+
 use reqwest::{self, blocking::get};
 
 #[derive(Debug, Default)]
 pub struct NetworkStats {
-    pub hashrate: Vec<(f64, f64)>,
+    pub hashrate: VecDeque<(f64, f64)>,
     pub difficulty: f64,
     pub height: u64,
     pub reward: u8,
@@ -13,7 +14,7 @@ pub struct NetworkStats {
 
 #[derive(Debug, Default)]
 pub struct PoolStats {
-    pub hashrate: Vec<(f64, f64)>,
+    pub hashrate: VecDeque<(f64, f64)>,
     pub connected_miners: u64,
     pub effort: f64,
     pub total_blocks: u64,
@@ -22,7 +23,7 @@ pub struct PoolStats {
 
 #[derive(Debug, Default)]
 pub struct MinerStats {
-    pub hashrate: Vec<(f64, f64)>,
+    pub hashrate: VecDeque<(f64, f64)>,
     pub average_hashrate: f64,
     pub pending_shares: f64,
     pub pending_balance: f64,
@@ -73,10 +74,9 @@ impl Stats {
                 Some(network_hashrate) => {
                     let network_hashrate =
                         ((network_hashrate / 1_000_000_000_000.0) * 100.0).round() / 100.0;
-                    self.network.hashrate.append(&mut vec![(
-                        block_height.unwrap() as f64 + 1.0,
-                        network_hashrate,
-                    )]);
+                    self.network
+                        .hashrate
+                        .push_back((block_height.unwrap() as f64, network_hashrate));
                 }
 
                 None => println!("No data available for Network Hashrate"),
@@ -129,7 +129,7 @@ impl Stats {
                     let pool_hashrate = ((pool_hashrate / 1_000_000_000.0) * 100.0).round() / 100.0;
                     self.pool
                         .hashrate
-                        .append(&mut vec![(self.network.height as f64 + 1.0, pool_hashrate)])
+                        .push_back((self.network.height as f64, pool_hashrate))
                 }
 
                 None => println!("No data available for Pool Hashrate"),
@@ -184,22 +184,12 @@ impl Stats {
                 self.pool.confirming_new_block = 100.0;
             }
         }
-        self.miner.hashrate = self.get_hashrate();
 
-        if self.network.hashrate.len() > 100 {
-            self.network.hashrate.remove(0);
-            self.pool.hashrate.remove(0);
+        if self.network.hashrate.len() > 720 {
+            self.network.hashrate.pop_front();
+            self.pool.hashrate.pop_front();
         }
 
         Ok(())
-    }
-
-    fn get_hashrate(&self) -> Vec<(f64, f64)> {
-        let mut data: Vec<(f64, f64)> = vec![];
-        let mut rng = rand::thread_rng();
-        for i in 0..10 {
-            data.insert(i, ((i + 1) as f64, rng.gen_range(15..=20) as f64));
-        }
-        data
     }
 }

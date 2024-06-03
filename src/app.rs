@@ -99,8 +99,16 @@ impl App {
             ],
             vec![" Block Reward ", " Reward Reduction in ", " ERG Price "],
             vec![
-                (stats.network.hashrate.last().unwrap().1.to_string()).as_str(),
-                (stats.network.difficulty.to_string() + "P").as_str(),
+                (stats
+                    .network
+                    .hashrate
+                    .back()
+                    .unwrap_or(&(0.0, 0.0))
+                    .1
+                    .to_string()
+                    + " Th/s")
+                    .as_str(),
+                (stats.network.difficulty.to_string() + " P").as_str(),
                 stats.network.height.to_string().as_str(),
             ],
             vec![
@@ -111,7 +119,7 @@ impl App {
             "Network Hashrate",
             "Block",
             "Th/s",
-            stats.network.hashrate.clone(),
+            stats.network.hashrate.clone().into_iter().collect(),
         );
 
         self.render(
@@ -124,7 +132,7 @@ impl App {
                 " Confirming block ",
             ],
             vec![
-                (stats.pool.hashrate.last().unwrap().1.to_string() + " Gh/s").as_str(),
+                (stats.pool.hashrate.back().unwrap().1.to_string() + " Gh/s").as_str(),
                 stats.pool.connected_miners.to_string().as_str(),
                 (stats.pool.effort.to_string() + " %").as_str(),
             ],
@@ -132,7 +140,7 @@ impl App {
             "Pool Hashrate",
             "Block",
             "Gh/s",
-            stats.pool.hashrate.clone(),
+            stats.pool.hashrate.clone().into_iter().collect(),
         );
 
         // Adding Progress Bar
@@ -179,7 +187,15 @@ impl App {
             ],
             vec![" Pending Shares ", " Pending Balance ", " Total Paid "],
             vec![
-                (stats.miner.hashrate.last().unwrap().1.to_string() + " Mh/s").as_str(),
+                (stats
+                    .miner
+                    .hashrate
+                    .back()
+                    .unwrap_or(&(0.0, 0.0))
+                    .1
+                    .to_string()
+                    + " Mh/s")
+                    .as_str(),
                 stats.miner.average_hashrate.to_string().as_str(),
                 stats.miner.round_contribution.to_string().as_str(),
             ],
@@ -191,7 +207,7 @@ impl App {
             "Miner Hashrate",
             "Time",
             "Mh/s",
-            stats.miner.hashrate.clone(),
+            stats.miner.hashrate.clone().into_iter().collect(),
         );
     }
 
@@ -240,13 +256,13 @@ impl App {
             .iter()
             .map(|&(x, _)| x)
             .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .unwrap_or(0.0);
 
         let max_value_x = data
             .iter()
             .map(|&(x, _)| x)
             .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .unwrap_or(0.0);
 
         // Create the X axis and define its properties
         let x_axis = Axis::default()
@@ -254,25 +270,25 @@ impl App {
             .style(Style::default().green())
             .bounds([min_value_x, max_value_x])
             .labels(vec![
-                (min_value_x - 1.0).to_string().into(),
+                min_value_x.to_string().into(),
                 ((min_value_x + max_value_x) / 2.0)
                     .round()
                     .to_string()
                     .into(),
-                (max_value_x - 1.0).to_string().into(),
+                max_value_x.to_string().into(),
             ]);
 
         let min_value_y = data
             .iter()
             .map(|&(_, y)| y)
             .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .unwrap_or(0.0);
 
         let max_value_y = data
             .iter()
             .map(|&(_, y)| y)
             .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .unwrap_or(0.0);
 
         // Create the Y axis and define its properties
         let y_axis = Axis::default()
@@ -283,16 +299,13 @@ impl App {
                 max_value_y + (max_value_y * 0.1),
             ])
             .labels(vec![
-                (min_value_y - (min_value_y * 0.1))
-                    .round()
+                ((((min_value_y - (min_value_y * 0.1)) * 100.0).round()) / 100.0)
                     .to_string()
                     .into(),
-                ((min_value_y + max_value_y) / 2.0)
-                    .round()
+                (((((min_value_y + max_value_y) / 2.0) * 100.0).round()) / 100.0)
                     .to_string()
                     .into(),
-                (max_value_y + (max_value_y * 0.1))
-                    .round()
+                ((((max_value_y + (max_value_y * 0.1)) * 100.0).round()) / 100.0)
                     .to_string()
                     .into(),
             ]);
