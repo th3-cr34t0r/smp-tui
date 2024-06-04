@@ -185,6 +185,7 @@ impl Stats {
             }
         }
 
+        //Store only the last 720 blocks (720 * 2min = 24h)
         if self.network.hashrate.len() > 720 {
             self.network.hashrate.pop_front();
             self.pool.hashrate.pop_front();
