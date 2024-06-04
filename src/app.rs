@@ -17,7 +17,9 @@ impl App {
         while !self.exit {
             match stats.get_data() {
                 Ok(_) => self.exit = false,
-                Err(_) => self.exit = true,
+                Err(_) => {
+                    println!("API UNREACHABLE!");
+                }
             }
 
             terminal.draw(|frame| self.render_frame(frame, &stats))?;
@@ -132,7 +134,15 @@ impl App {
                 " Confirming block ",
             ],
             vec![
-                (stats.pool.hashrate.back().unwrap().1.to_string() + " Gh/s").as_str(),
+                (stats
+                    .pool
+                    .hashrate
+                    .back()
+                    .unwrap_or(&(0.0, 0.0))
+                    .1
+                    .to_string()
+                    + " Gh/s")
+                    .as_str(),
                 stats.pool.connected_miners.to_string().as_str(),
                 (stats.pool.effort.to_string() + " %").as_str(),
             ],
