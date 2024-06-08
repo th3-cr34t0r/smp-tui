@@ -1,0 +1,3 @@
+# A fun little project using Ratatui library for Rust
+- Implementing the Sigmanauts Mining Pool dashboard features in a terminal'
+- Probably wont be fnishied anytime soon...
